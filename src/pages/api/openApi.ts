@@ -13,6 +13,10 @@ export const runtime = "edge";
 const handler = async (req: Request) => {
   const { message } = (await req.json()) as RequestData;
 
+  if (message.length > 50 || !message) {
+    return new Response("リクエストに失敗しました。", { status: 400 });
+  }
+
   const prompt = `From now on, I will create a character for "Call of Cthulhu RPG". The conditions for creating a character are specified in the "Conditions" segment, so create a "Call of Cthulhu RPG" character accordingly. The output should follow the format given in the "Output" segment.Please output in Japanese.
 ---Conditions---
 ・${message}
