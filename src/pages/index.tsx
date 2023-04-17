@@ -1,3 +1,4 @@
+"use client";
 import { useState } from "react";
 import { TextField, Container, Box, Typography } from "@mui/material";
 import LoadingButton from "@mui/lab/LoadingButton";
@@ -6,8 +7,8 @@ import React from "react";
 
 export default function Home() {
   const [input, setInput] = useState("");
-  const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [responseArr, setResponse] = useState<string>();
 
   const handleChange = (
     event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>
@@ -27,14 +28,37 @@ export default function Home() {
     const response = await fetch("/api/openApi", {
       method: "POST",
       headers: {
-        "Content-Type": "text/plain",
+        "Content-Type": "application/json",
       },
-      body: input.trim(),
+      body: JSON.stringify({
+        message: input.trim(),
+      }),
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(response.statusText);
+    }
+
+    const data = response.body;
+    if (!data) {
+      return;
+    }
+
+    const reader = data.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+
+    let currentResponse: string[] = [];
+
+    while (!done) {
+      const { value, done: doneReading } = await reader.read();
+      done = doneReading;
+      const chunkValue = decoder.decode(value);
+      currentResponse = [...currentResponse, chunkValue];
+
+      setResponse(currentResponse.join(""));
+    }
     setLoading(false);
-    setOutput(data.message);
   };
 
   return (
@@ -63,11 +87,11 @@ export default function Home() {
           <span>キャラを作成</span>
         </LoadingButton>
       </Box>
-      {output && (
+      {responseArr && (
         <Box>
           <Typography variant="h6">生成されたキャラクター:</Typography>
           <Typography>
-            {output.split("\n").map((item, index) => {
+            {responseArr.split("\n").map((item, index) => {
               return (
                 <React.Fragment key={index}>
                   {item}

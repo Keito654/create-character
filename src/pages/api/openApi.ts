@@ -1,20 +1,21 @@
-import { NextApiHandler } from "next";
+import { OpenAIStream, OpenAIStreamPayload } from "../../utils/openAIStream";
 
-const handler: NextApiHandler = async (req, res) => {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "user",
-          content: `From now on, I will create a character for "Call of Cthulhu RPG". The conditions for creating a character are specified in the "Conditions" segment, so create a "Call of Cthulhu RPG" character accordingly. The output should follow the format given in the "Output" segment.Please output in Japanese.
+type RequestData = {
+  message: string;
+};
+
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error("Missing env var from OpenAI");
+}
+
+export const runtime = "edge";
+
+const handler = async (req: Request) => {
+  const { message } = (await req.json()) as RequestData;
+
+  const prompt = `From now on, I will create a character for "Call of Cthulhu RPG". The conditions for creating a character are specified in the "Conditions" segment, so create a "Call of Cthulhu RPG" character accordingly. The output should follow the format given in the "Output" segment.Please output in Japanese.
 ---Conditions---
-・${req.body}
+・${message}
 
 ---Output---
 キャラクター名：{Character name}
@@ -22,6 +23,7 @@ const handler: NextApiHandler = async (req, res) => {
 性別:{Sex}
 経歴:{Career}
 性格：{Personality}
+
 経歴や性格の詳しい説明: {Detail career and personality}
 
 能力値
@@ -36,16 +38,21 @@ EDU: {edu number, 3~21}
 
 技能
 {skill name}: {skill point number, 1~90}
-`,
-        },
-      ],
-    }),
-  });
+`;
 
-  const data = await response.json();
-  res.json({
-    message: data.choices[0].message.content,
-  });
+  const payload: OpenAIStreamPayload = {
+    model: "gpt-3.5-turbo",
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+    stream: true,
+  };
+
+  const stream = await OpenAIStream(payload);
+  return new Response(stream);
 };
 
 export default handler;
